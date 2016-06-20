@@ -1,0 +1,84 @@
+
+YP Makefiles
+============
+
+The common use of a /var/yp/Makefile and associated logic to build
+on-disk databases using 'makedebm' is a common feature on all
+targeted platforms.  Main targets within each makefile are outlined
+in subsequent sections for a reference in ensuring that related
+maps in entdb are cross platform or can be engineered as such where
+possible.
+
+Linux Makefile
+--------------
+
+Taken from RHEL6
+
+ethers:         ethers.byname ethers.byaddr
+hosts:          hosts.byname hosts.byaddr
+networks:       networks.byaddr networks.byname
+protocols:      protocols.bynumber protocols.byname
+rpc:            rpc.byname rpc.bynumber
+services:       services.byname services.byservicename
+passwd:         passwd.byname passwd.byuid
+group:          group.byname group.bygid
+shadow:         shadow.byname
+passwd.adjunct: passwd.adjunct.byname
+netid:          netid.byname
+netgrp:         netgroup netgroup.byhost netgroup.byuser
+publickey:      publickey.byname
+mail:           mail.aliases
+timezone:      timezone.byname
+locale:                locale.byname
+netmasks:      netmasks.byaddr
+
+OpenBSD Makefile
+----------------
+
+Taken from OpenBSD 5.9
+
+passwd: passwd.time
+group: group.time
+hosts: hosts.time
+ethers: ethers.time
+networks: networks.time
+rpc: rpc.time
+services: services.time
+protocols: protocols.time
+netid: netid.time
+netgroup: netgroup.time
+amd.home: amd.home.time
+aliases: aliases.time
+
+Solaris Makefile
+----------------
+
+Taken from Solaris 10
+
+passwd: passwd.time
+group: group.time
+project: project.time
+hosts: hosts.time
+ipnodes: ipnodes.time
+ethers: ethers.time
+networks: networks.time
+rpc: rpc.time
+services: services.time
+protocols: protocols.time
+netgroup: netgroup.time
+bootparams: bootparams.time
+aliases: aliases.time
+publickey: publickey.time
+netid: netid.time
+passwd.adjunct: passwd.adjunct.time
+group.adjunct: group.adjunct.time
+netmasks: netmasks.time
+timezone: timezone.time
+auto.master: auto.master.time
+auto.home: auto.home.time
+auth.attr:auth.attr.time
+exec.attr:exec.attr.time
+prof.attr:prof.attr.time
+user.attr:user.attr.time
+audit.user:audit.user.time
+ageing: ageing.time

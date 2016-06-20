@@ -1,0 +1,497 @@
+
+Securing Password Hashes in NIS
+-------------------------------
+
+This section outlines methods of securing password databases when
+a NIS backend is used, and discusses a solution which provides
+a 'sealed system' level of security within the NIS network - that is
+to say, that password hashes can be considered to be 'secret' to
+all non-administrative users, provided the network infrastructure 
+can be trusted, and every individual host participating in the NIS
+system is protected from root-level compromise.
+
+Historical Background
+~~~~~~~~~~~~~~~~~~~~~
+
+Note - while not a proper research document, most of this is
+roughly true and should hold up to fact checking, etc.
+
+Originally, in 'classic' v7 unix, password hashes were simply kept 
+in the main /etc/passwd file along with other user data. Since this
+file is the main file used to store user metadata, such as user ID's,
+etc. it is world readable. 
+
+This is also the same file format used in the 'classic' CSRG / BSD
+Unix derivitives (e.g. 4.2BSD, 4.3BSD) popular in the mid-eighties
+during the rise of the 'networked workstation' era as the timesharing
+minicomputer era began to wane, which also formed the basis of the 
+Sun microsystem's own SunOS unix release. 
+
+As one of the original vendors of Unix workstations, SUN microsystems
+implemented SunOS as their unix flavor to be sold along with their
+workstations, and implemented an early network RPC mechanism
+called 'Sun RPC' in order to create a network programming middleware
+mechanism which could be used to more easily network workstations
+together, and also created NIS using this protocol suite as a 
+way to centralize authentication and other administrative data 
+on a network of workstations.
+
+Due to the industry leadership of SUN at the time, NIS became a
+defacto standard for distributing network authentication data to
+unix workstations in the late 80's and early/mid 90's prior to the
+growth of PC networking and the need for larger scale interoperability.
+NIS is a fairly straightforward system, which allows for
+network-distributed hashtable lookup, and as originally implemented,
+used the v7 password file format for password interchange over NIS
+
+As such, NIS implementations by default expect to use recieve v7 password 
+information when retrieving password data.
+
+At the time that v7 unix and it's password file was implemented,
+computers were mostly physically isolated and so there was a degree
+of trust among users, password cracking was very computationally
+intensive, and so having password hashes available was not a big
+security risk. As time progressed however, tools such as password
+cracking, the larger scale deployment of networking, and the
+increased reliance on computers in general made the need for increased
+system security a more important requirement, and so shadow passwords
+(keeping the encrypted passwords in separate files) were deployed
+as a way of isolating the sensitive password information from the
+other public user metadata information kept on a system.
+
+As a result of this increased need for system security,
+Sun microsystems, in later versions of SunOS v4, which was a 
+major leader if not the main choice in the proprietary unix world 
+of the early 90's, began to offer something called C2 security,
+along with 'NIS+', which offered improved security for RPC services
+via the use of items such as shadow passwords and encrypted/keyed RPC.
+
+One of the mechanisms put in place by C2 security was
+the 'passwd.adjunct' file, which was an early implementation of 'shadowed'
+passwords for Sun OS systems. Because this format was widely deployed
+in SunOS, and widely deployed in NIS systems as a means to secure
+the password hashes, it also became a defacto standard for user
+account authentication data on various NIS implementations in other
+platforms including linux.
+
+However, during the late 90's, as a result of a combination of
+factors, such as the complicated nature of deploying NIS+, which
+did not see widescale implementation among other vendors, the
+percieved nature of NIS as being insecure due to it's implicit host
+based trust, the lack of availibility of IPSec as a means to secure
+the host-based trust of RPC, the growth of other interoperable
+solutions such as LDAP, and an improvement of security audting
+features in SunOS, the C2 security features became depreciated in
+Solaris, and the related documentation, including the mechanism of
+passwd.adjunct and related formats became somewhat buried and lost
+to time.
+
+However, when used in combination with IPSec, deploying passwd.adjunct
+shadow passwords can be used as a way to ensure increased security
+of NIS-managed hosts, without the risk of password hash leaks,
+provided any NIS-managed hosts are not themselves compromised.
+Therefore, it is useful and worthwhile to deploy this mechanism of
+authentication within a NIS network, and subsequent sections discuss
+how this is done and the specific level of security provided by
+such a configuration.
+
+A Note about Linux Shadow Files
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Linux typically does not use passwd.adjunct for local shadow
+passwords, but instead uses a file called '/etc/shadow'. The Linux
+NIS implementation can simply look up shadow information over NIS,
+however there are some subtle nuances in using shadow NIS on linux
+which will be discussed below.
+
+Using SunOS passwd.adjunct files with NIS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. todo: discuss setting up nis alias for ypcat passwd.adunct
+
+The SunOS passwd.adjunct file is an auxiliary database used to 
+store encrypted password hashes along with other C2 authentication
+related data. A copy of a SunOS 4.1.2 manual page for passwd.adjunct(5)
+is provided in this source archive.
+
+Essentially, it provides the following information::
+
+  name:password:min-label:max-label:default-label:
+    always-audit-flags:never-audit-flags:
+
+where name and password provide the shadow functionality, and other
+fields are used by the SunOS-specific C2 security auditing infrastructure.
+
+As such, we are only concerned with name/password fields for the
+purposes of this discussion. The password must be in a format acceptable
+to the crypt(3) or crypt(3c) function on the client computer used to
+authenticate the user. 
+
+Since the crypt routines are used for password hashing, it is
+worthwhile to review all related systems to ensure that the hashes
+will be compatibile and to consider configuring all participating
+systems to use the most secure commonly understood format on the
+network. At the time of writing, md5 hashes were the most-secure
+hash format available to all systems participating in the NIS
+infrastructure and perl code readily available in packages to support
+password generation on all platforms, and so is considered to be
+the least common denominator in the entdb codebase. More details
+on this are in the doc/ref/hashes.txt document.
+
+Although there is always some room for variation among unices,
+password hashes are typically of the format:
+
+  - :des-hash:
+  - :$N$other-hash:
+
+The string '$N$' where 'N' is a digit, is typically a special
+selector used to specify a hash format which the crypt function
+will use other than DES hashes.  The 'des hash' is the traditional
+v7 format, which is why it is usually unique in being the only hash
+format which does not require a '$N$' selector.  Due to the need
+for interoperability, these selectors tend to be syncronized across
+Unix vendors, but this is not a guaranteed thing, so specific
+documentation should be consulted if deploying new platforms to a
+NIS network, however, on selector-using platforms, the $1$ format
+typically refers to MD5 hashes, as the first extended-format password
+hash used this selector, and was implemented on FreeBSD, and so
+other implementations likely copied from this at base.
+
+In order for SunOS to know that it was to use the passwd.adjunct
+file to retrieve a password hash, the string '##logname' was used
+in the password field of the traditional v7 password file - for example,
+an /etc/passwd entry of::
+
+  luser:##luser:503:100:luser,,,:/usr/home/luser:/bin/sh
+
+would indicate that the password hash for the user 'luser' should be 
+looked up via the passwd.adjunct mechanism, and an existing password
+file could be converted to delegate to passwd.adjunct hashes as follows::
+
+  awk -F: '{print $1":##"$1":"$3":"$4":"$5":"$6":"$7 }' < passwd
+ 
+And the adjunct file itself could be generated from a v7-style password
+file as follows::
+
+  awk -F: '{printf("%s:%s::::::\n", $1, $2)}' passwd > passwd.adjunct
+                
+In order complete the process of making a shadow password available
+to a SunOS / solaris machine via NIS, a password entry such as the one above
+would be made, along with an additional NIS map, passwd.adjunct.byname.
+This map should be created with the 'secure' flag to makedbm(8),
+which will indicate to the NIS server that it should reject all
+queries against this map from non-priveledged ports, which in turn
+means that the shadow password hashes cannot be queried from untrusted
+hosts, provided that the network is secure.
+
+Deploying IPSec against the hosts along with a host-level firewall
+to prevent unauthenticated traffic from passing to the NIS server
+provides this network security, therefore ensuring a 'sealed-system' 
+of network-level integrity and security of the NIS infrastructure.
+
+However, in the event of a root compromise of one of the client
+machines, the databases can be queried and the password hashes
+taken, so it is important to ensure all client systems are patched
+and up to date to keep the password hashes secure, since the overall
+system vulnerability, assuming equal access to all users, is essentially
+the sum of all weaknesses in all of the connected hosts.
+
+The logic provided in this module properly manage the passwd.adjunct
+file from source linux password/shadow pairings in a way that will
+properly integrate with the linux-based NIS server package.
+
+NIS Selectors and Linux
+~~~~~~~~~~~~~~~~~~~~~~~
+.. TODO: overall discussion of selectors is a bit unclear/fuzzy..
+
+As mentioned previously, Linux can natively retrieve it's own
+shadow password format via NIS if configured with 'files nis' 
+in /etc/nsswitch.conf. However, at the time of writing on RHEL5 and RHEL6,
+using 'nis' in nsswitch.conf files
+does not properly permit use of NIS selectors in the local /etc/passwd
+file to block out client access, and so clients deployed in this
+manner will not be able to have both a full view of all user ids
+and a limited access list, only being able to either have full 
+authentictation to all NIS users, or a limited view of user ids for
+the specific set of groups allowed to the system, with the remaining
+users not being resolvable.
+
+This is not a desired situation, since when using a shared fileserver,
+it is often useful to at least know the owner of various files
+without needing to login to another system, etc. to be able to use
+common tools such as 'ls' to see the username of the file ownership. 
+
+Luckily, there is another nsswitch module, called 'compat', which
+is designed to be compatible with solaris, and therefore permits
+'##userid' hash lookup as well as NIS selectors in the password
+file. When this configuration is used, NIS selectors can be provided
+in the local /etc/passwd file to give access to the system to certain
+groups and to filter out access to others.
+
+.. FIXME: reclarify
+
+Put another way, for linux systems using NIS shadow passwords, do this::
+
+  # egrep '^(passwd|shadow)' /etc/nsswitch.conf 
+  passwd:     compat
+  shadow:     compat
+  # tail -n 2 /etc/passwd
+  +@foo::::::
+  +:*:::::/sbin/nologin
+  # ypcat passwd
+  luser:##luser:503:100:luser,,,:/usr/home/luser:/bin/sh
+  foouser:##foouser:502:100:foouser,,,:/usr/home/foouser:/bin/sh
+
+instead of simply this::
+
+  # grep '^passwd' /etc/nsswitch.conf
+  passwd:     files nis
+
+because if you do, you will get this::
+
+  # getent passwd |egrep '(foouser|luser)'
+  foouser:$1$HASHSTUFF:502:100:user in foo group,,,:/usr/home/foouser:/bin/sh
+  luser:*:503:100:luser,,,:/usr/home/luser:/sbin/nologin
+
+instead of this::
+
+  # getent passwd |tail -n 4
+  luser:##luser:503:100:luser,,,:/usr/home/luser:/bin/sh
+  foouser:##foouser:502:100:foouser,,,:/usr/home/foouser:/bin/sh
+
+which would allow shadow lookups to succeeed and a shell to
+be given to the account. In otherwords - on restricted-access
+machines, properly using adjunct-style/compat authentication REQUIRES
+the use of an 'include' selection when combined with a 'restrict'
+entry for the expansion to work.  For example::
+
+  +@someusers
+  +:*:::::/sbin/nologin
+
+in the case of machines accepting a restricted subset of users, or:
+
+  +@allusers
+
+for all user machines.
+
+Simply using '+' instead of the '+@group-and-selector approach,
+will result in lookups against 'shadow' map because adjunct will
+not be 'interpolated' by the 'compat' code, allowing the passwords
+from the shadow map to 'pass through'. For all-user machines, since
+we are maintaining shadow maps, this is fine, but not ideal, since
+it is best to use the same specific authentication mechanism for
+all machines. However, to note, when using the 'passwd.adjunct'
+mechanism on linux instead of the nis-shadow method, a message will
+be logged to the system authentication log stating that the user's
+shadow password was not available. This is technically correct -
+since the 'passwd.adjunct' shadowed-hash was used instead of the
+native 'shadow' hash.
+
+Side note: the 'ypcat' command will simply dump a NIS map using YP
+calls, whereas the 'getent' command will show the result of processing
+the C library system call to the appropriate function via nsswitch.conf
+configuration on the system - and so as can be seen from the above
+examples, with proper 'compat' configuration, the special '##logname'
+hashes are expanded against the 'passwd.adjunct' file and the entry
+results in a v7 format entry with included crypt() hash - this same
+command does *not* work when run as a normal user, since the
+underlying RPC requests for the passswd.adjunct.byname NIS map fail,
+and so the unpriveledged user is only able to see the '##logname'
+hash entries - further proving the increased security of this
+configuration.
+
+Correctly generating passwd.adjunct
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Currently, as is implemented in the dumppaswwdadjunct, the
+passwd.adjunct is generated simply as a copy of the hashes in shadow
+db tables.
+
+Eventually, if account password expiration is implemented in this
+configuration, this file should be generated using a tool smart
+enough to determine expired accounts and 'lock' them accordingly
+by dumping invalid hashes, and a cron job could be configured run
+to lock the accounts periodically, otherwise, expired accounts would
+still be accessable on those systems not smart enough to parse the
+'native' shadow password file which contains account expiry
+information.
+
+Further testing should be done concerning password expiration
+as this is implemented.
+
+Integrating the rpc.yppasswdd server to passwd.adjunct scheme
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Currently linux-specific and incomplete. YMMV.
+
+The yp password changing mechanism uses a client/server model and
+a simple trust model to perform password changes over Sun RPC.
+Traditionally, A user initiates a password change request via
+the yppasswd(1) program, which in turn communicates with the 
+rpc.yppasswdd server on the NIS master to perform the change 
+in the reference files and also to rebuild the NIS maps.
+
+The details of this exchange are as follows:
+
+  1) The yppasswd program is run by the user.
+  2) The yppasswd program performs a local comparison of the NIS 
+     password hash against a local hash generated from user input
+  3) If the comparison succeeds, then yppasswd prompts for a new
+     password from the user and confirms the choice.
+  4) The plaintext of the current password and the hash of the new
+     password are submitted to the server, where the plaintext is
+     reverified by the server.
+  5) If the server side verification of the submitted password succeeds,
+     the provided hash is merged into the NIS password files, and
+     a process is spawned to rebuild the NIS DBM maps and notify
+     the NIS server that updated database files are ready for use.
+  6) The yppasswd program recieves a status notification from the server
+     and terminates.
+
+The default behavior in step 5 is as follows:
+
+The linux rpc.yppasswdd spawns the /usr/lib64/yp/pwupdate program, 
+which in turn runs::
+
+  if (shadow_changed)
+    execlp (MAP_UPDATE_PATH, MAP_UPDATE, "shadow", NULL);
+  else
+    execlp (MAP_UPDATE_PATH, MAP_UPDATE, "passwd", NULL);
+
+which, after expanding the related macros, essentially translates
+to 'cd /var/yp; make -k' += shadow or passwd depending on which target
+is needed. In the default, flat-file case, this in turn implies
+that the related makefile targets should also trigger a regeneration
+of the passwd.adjunct file to ensure the shadowed password is up
+to date after a change, e.g. by updating the 'shadow:' target
+to include::
+
+  shadow:         shadow.byname passwd.adjunct
+
+or similar.
+
+However, since entdb does not directly use flat files to manage the
+definitive shadow information, the default '/usr/lib64/yp/pwupdate'
+program will not work, and the instead -E functionality of rpc.yppasswdd
+should be utilized to support rpc.yppasswdd intergration, which
+unfortunately is not yet implemented. 
+
+Additionally, since a hashed password is provided by the client, and 
+there is no way to update all of the related hash formats in the 
+database, there is no way to properly or simply integrate yppasswdd
+in this manner in a cross-platform way without further tweaks,
+such as running multiple yppasswdd programs and port redirection
+or similar. Due to the complexitiy of such a configuration it would
+likely be simpler to implement some other means of updating the entdb
+data as is necessary if cross-platform functionality is required.
+
+Ideally such a component will be provided in a future version.
+
+Configuring clients for rpc.yppasswdd
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. TODO: properly integrate / retest:
+.. 
+..  - YP_PASSWD_HASH=MD5 in system profile for yppasswd
+..  - Verify 'fresh' use of authconfig settings is correct
+..    most specifically need correct nsswitch settings for 'files compat'
+..    and also ensure that passwd will NIS-push and use MD5 hashes
+..  - Merge/add authconfig setup to nis/client in 'bootstrap' target stuffs
+..  - Document resultant pam / login.defs, nsswitch settings, etc.
+..    for reference
+..  - Then remove this todolist section
+.. 
+.. END TODO
+
+Information specific to proper integration of Linux clients and yppasswdd
+is as follows.
+
+Since the NIS password mechanism, like other components of UNIX 
+authorization, is built around use of the system crypt(3) routines 
+and through instrumenting getpwent(3) calls, we must configure 
+any client systems to both authenticate against NIS routines,
+and also to properly hash new password values for interaction with
+the rpc.yppasswdd server.
+
+In order to support a variety of authentication environments and
+legacy settings, current linux systems have several layers where 
+these configurations can occur:
+
+  - In environment settings
+  - In configuration directly used by the utilities themselves
+  - In C Library configurations, including nsswitch.conf
+  - In PAM configuration
+
+With various tools relying on various settings in each layer.
+
+To aid in dealing with this configuration, RHEL provides a configuration
+utility called authconfig which can be used to configure many of
+these settings at once. However, unfortunately, this tool as 
+distributed in RHEL5 and RHEL6 does not properly handle the 'compat'
+method of NIS authentication, despite some hints that it could in
+the future[#]_.
+
+.. [#] http://pkgs.fedoraproject.org/cgit/authconfig.git/diff/?id=200e3c2eff963cdd95a3e77b2db6d900b0f49fa6 
+
+To manually configure clients to work via NIS using remote password 
+changes and also using MD5 passwords the following is run::
+
+  # authconfig --enablelocauthorize --enablenis \
+    --usemd5 --passalgo=md5 --update --nostart
+  # perl -pi -e 's/^(passwd|shadow):.*/$1: compat/' /etc/nsswitch.conf
+
+However, because the actual list of files changed is fairly extensive, 
+and version controlled in the nis/client module, the above example 
+is useful mainly for illustration. 
+
+Once configured, systems configured in this way can simply use the
+standard passwd(1) utility to update NIS passwords, with the
+underlying pam NIS module handling the backend communication to the
+rpc.yppasswd server. It should be noted, however, this does not
+allow root-side updating of the password if nis is enabled, as the
+password tools (passwd) won't prompt for an authorization password,
+which is expected by the NIS backend. 
+
+Unforutnately, authconfig does not configure the proper settings for
+the yppasswd(1) command, which requires an environment setting::
+
+  $ export YP_PASSWD_HASH=MD5
+  $ yppasswd
+
+
+this should therefore be placed in system profiles and other
+login-related settings so that it is present by default in the user
+environment on associated hosts.
+
+Disabling NIS Clients
+~~~~~~~~~~~~~~~~~~~~~
+
+Included for completeness - the following command can be run::
+
+  # authconfig --enablelocauthorize --disablenis \
+  --disablemd5 --passalgo=sha512 --update --nostart
+
+although it would be better to also manage any non-nis systems via
+flat files in the src/host area.
+
+Server-Side Password Changes and rpc.yppasswdd
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Password resets on RHEL NIS servers configured with a separate NIS
+data area are unfortunately not straightforward due to interaction
+of the following problems:
+
+  - The passwd(1) utility does not accept selection of arbitrary files,
+    instead delegating password changes to underlying PAM modules,
+    which cannot be configured to use arbitrary password file locations.
+  - The rpc.yppasswdd server as built by Red Hat is not configured
+    with the 'CHECKROOT' option which cross-check the root-password 
+    for password resets, meaning that only those who know the password  
+    being changed are able to use NIS initiated password changes via 
+    yppasswd. Since typically system administrators reset passwords 
+    without knowledge of these passwords, this is not ideal.
+
+Because these problems overlap, and rule out both local passwd(1) 
+password resets and yppasswd(1) resets, the broken-out NIS directory
+configuration as expected via entdb dumps requires administrators
+use the entdb utility itself, followed by a NIS map rebuild 
+to properly set user passwords.
+

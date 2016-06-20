@@ -1,0 +1,41 @@
+
+Preventing/Mitigating NIS Network Attacks with IPSec
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The passwd.adjunct mechanism described here creates a 'sealed-system'
+for NIS security only so long as the network infrastructure and
+participating hosts can be trusted - For example, host-IP spoofing
+or physical manipulation of servers and their installed system could
+result in a compromised machine participating in the NIS network,
+which in turn implies a potential leak of associated hashed password
+data which could then be used as input data to a dictionary attack
+or other means to expand access within the system.
+
+In order to mitigate against this weakness, IP Security can be
+deployed amongst the participating hosts in the network to ensure
+that only properly authorized physical hosts are able to participate
+in the NIS network. If a simple 'system integrity' is required,
+using IPSec in a Ike-PSK/AH/Transport mode in order to protect the
+hosts against host based should be sufficient in most cases to
+prevent compromise of the key data by unknown hosts Per this scheme,
+it is assumed that the network core can be trusted, but that the
+endpoints could be manipulated. A more robust methodology would
+utilize an ESP security mode, potentially with better keying
+methodologies, and would be required to protect password hash data
+if the network core could not be trusted.
+
+It should be noted that the system as configured still distributes
+ipsec key data to the participating hosts, and that this key data
+can be retrieved in plaintext via software - therefore, a physically
+or software-compromised host in the network still could access the
+secured NIS server and associated password data via the usual NIS
+query methods after joining or using the existing access via ipsec.
+
+However, as noted, using IPSec and a separated shadow password
+method should provide a sealed system whereby system compromise can
+be contained and mitigiated to the level of the given NIS domain -
+after compromise is detected, contained and attack vectors are
+determined and properly mitigated, a forced password change and
+update of affected IPSec keys should be sufficient to restore the
+system to a self-contained, sealed level.
+

@@ -1,0 +1,22 @@
+# $Id: passwd.adjunct.5.readme 737 2013-10-15 21:51:30Z cat8 $
+
+Though passwd.adjunct NIS authentication is functional on modern
+Solaris, the 'passwd.adjunct' manpage has not been included in
+solaris since at least solaris9, and quite possibly since the
+apostate inception of solaris (SunOS 5) itself.
+
+Unsurprisingly, documentation for linux's 'compat' implementation
+of similar features is not widely available either.
+
+A quick google thankfully locates it on 'stuff.mit.edu'[1], and it
+has been included here for reference in deploying a secured-NIS
+infrastructure.
+
+Files:
+
+  passwd.adjunct.5 : original manual page
+  passwd.adjunct.5.URL : url of original manual page
+  passwd.adjunct.5.readme : this note
+  passwd.adjunct.5.txt : preformatted copy of page
+
+.. [1] http://stuff.mit.edu/afs/net/system/sun4c_41/rsp.01/usr/man/man5/passwd.adjunct.5

@@ -1,0 +1,64 @@
+
+Current system low level OO model is not very clean, reflecting
+organic growth. Ideally, the system would provide a clean set of
+user objects, etc. and the database object would be an orm-like
+means to fetch/update/retrieve items. However, this will take a
+good deal of code reorg, and main focus now is simply getting the
+'base client' usage functional e.g. the entdb tools ability to build
+a DB and dump the contents to usable flatfiles. after this base
+functionality is implemented, the lower-level OO stuff can be
+reworked to fit this model, however care should be preserved to
+maintain the 'read sequence' libc semantics documented in the SQL
+schema module to ensure generated files match input files since the
+system use of generated files determines system behavior (e.g.
+primary vs aux groups, use of 1st name in event of duplicate uids,
+other similar items)
+
+- EntDB and User / Group class interface:
+  e.g. entdb should have 'crud' ops for EntDB::User/Group, etc.
+  objects
+
+- User/Group aggregate function hack cleanups - implies e.g.
+  - get(User|Group|NetGroup)List, dump(User|Group|NetGroup)List 
+    use some sort of 
+    aggregate functions and/or objects ala native calls -
+    and probably need to have clear specification / ideas in API on whether
+    we are pulling from system or pulling from db, etc.
+
+    e.g. build the databse using something like:
+
+    while ($u = EntDB::User::sys_getpwent()) {
+       $entdb->addUser($u);
+    }
+
+    the dump portion is mostly implemented as e.g. EntDB::getpwent,
+    and so is goodish from API perspective, however returns raw DB
+    data instead of EntDB::User objects, which would be more OOish
+    and therefore 'correct' - e.g. do this:
+
+      while($u = $EntDB->getpwent()) {
+	$u->toPasswd();
+      }
+
+    instead of:
+
+      while($u = $EntDB->getpwent()) {
+	print $u->{uname} ... "yadda yadda"
+      }
+
+    however, this means db objects are roughly equiv. to 'base' User::pwent,
+    which are hash classes, so current usage might be best and simply
+    provide class methods for conversion to keep 'datatype' the same.. hmm
+
+    further thought: have UserList class which is just static methods on
+    array of user objects.. & will 'toFormat' them..
+
+    and also, to ensure simple 1:1 api with User::pwent classes, etc,
+    perhaps rework ::User , ::Group, etc. to be a library of functions
+    rather than a set of OO classes.. DB can still be object,
+    but simply an OO means to deal with fetching/retrieving/updating
+    User::pwent and other similar classes.
+
+- clean enough user model to allow simple subclassing for use in 
+  user 'account type' configurations
+

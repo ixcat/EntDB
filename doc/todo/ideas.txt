@@ -1,0 +1,29 @@
+Future Directions
+-----------------
+
+- /etc/hosts handling
+
+  More code, aux tables required.
+
+  Not strictly required for base NIS functionality.
+
+  However, as a bonus collects info for potential DNS / named integration -
+  similarly parsing of ethers files would allow DHCP generation, etc.
+  if not, could at least generate localhost/localhost6 and nis server hosts
+  entries for client /etc/hosts configuration.
+
+- makedbm capability?
+
+  - could simplify much parsing code if loaddbm / dumpdbm compatibility 
+    layer implemented..
+
+    although, on 'loadbm' side, would lose granularity of record values, 
+    1:M relationships in SQL. Would be useful for direct & simple k/v 
+    lookups for arbitrary tables
+
+- filesystem quota support
+
+  implement filesystem quota support in database to allow 
+  setting/updating/queriying of user quotas.
+
+

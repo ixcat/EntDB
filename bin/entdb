@@ -1,0 +1,63 @@
+#! /usr/bin/env perl
+
+# entdb: EntDB cli ui
+#
+# implemented via User::EntDB::Command framework -
+# details in various User::EntDB::Command classes
+# and in other library code.
+#
+
+package main;
+
+use strict;
+use warnings;
+
+use FindBin;
+use lib "$FindBin::Bin" . "/../lib";
+
+use User::EntDB::Command;
+
+use User::EntDB::Command::CreateDatabase;
+use User::EntDB::Command::PrintSchema;
+
+use User::EntDB::Command::LoadGetent;
+use User::EntDB::Command::LoadMailAliases;
+use User::EntDB::Command::LoadKeyValue;
+use User::EntDB::Command::LoadNetgroup;
+
+use User::EntDB::Command::SetPassword;
+
+use User::EntDB::Command::DumpBSDPasswd;
+use User::EntDB::Command::DumpMailAliases;
+use User::EntDB::Command::DumpKeyValue;
+use User::EntDB::Command::DumpGroup;
+use User::EntDB::Command::DumpLinuxPasswd;
+use User::EntDB::Command::DumpLinuxShadow;
+use User::EntDB::Command::DumpNetgroup;
+use User::EntDB::Command::DumpPasswdAdjunct;
+
+(my $me = $0) =~ s:.*/::;
+
+my $app = User::EntDB::Command->new({
+	appname => $me,
+	cmdlist => [
+		'User::EntDB::Command::CreateDatabase',
+		'User::EntDB::Command::PrintSchema',
+		'User::EntDB::Command::LoadGetent',
+		'User::EntDB::Command::LoadNetgroup',
+		'User::EntDB::Command::LoadMailAliases',
+		'User::EntDB::Command::LoadKeyValue',
+		'User::EntDB::Command::SetPassword',
+		'User::EntDB::Command::DumpBSDPasswd',
+		'User::EntDB::Command::DumpLinuxPasswd',
+		'User::EntDB::Command::DumpLinuxShadow',
+		'User::EntDB::Command::DumpPasswdAdjunct',
+		'User::EntDB::Command::DumpGroup',
+		'User::EntDB::Command::DumpNetgroup',
+		'User::EntDB::Command::DumpMailAliases',
+		'User::EntDB::Command::DumpKeyValue',
+	]
+});
+
+exit $app->main(\@ARGV);
+

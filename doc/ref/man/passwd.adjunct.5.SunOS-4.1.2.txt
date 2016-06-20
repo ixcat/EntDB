@@ -1,0 +1,92 @@
+PASSWD.ADJUNCT(5)					     PASSWD.ADJUNCT(5)
+
+
+
+NNAAMMEE
+       passwd.adjunct - user security data file
+
+SSYYNNOOPPSSIISS
+       //eettcc//sseeccuurriittyy//ppaasssswwdd..aaddjjuunncctt
+
+DDEESSCCRRIIPPTTIIOONN
+       The  ppaasssswwdd..aaddjjuunncctt  file  contains  the following information for each
+       user:
+
+	      _n_a_m_e::_p_a_s_s_w_o_r_d::_m_i_n_-_l_a_b_e_l::_m_a_x_-_l_a_b_e_l::_d_e_f_a_u_l_t_-_l_a_b_e_l::_a_l_w_a_y_s_-_a_u_d_i_t_-
+	      _f_l_a_g_s::_n_e_v_e_r_-_a_u_d_i_t_-_f_l_a_g_s::
+
+       _n_a_m_e		   The	user's login name in the system and it must be
+			   unique.
+
+       _p_a_s_s_w_o_r_d 	   The encrypted password.
+
+       _m_i_n_-_l_a_b_e_l	   The lowest security level at  which	this  user  is
+			   allowed to login (not used at C2 level).
+
+       _m_a_x_-_l_a_b_e_l	   The	highest  security  level at which this user is
+			   allowed to login (not used at C2 level).
+
+       _d_e_f_a_u_l_t_-_l_a_b_e_l	   The security level at  which  this  user  will  run
+			   unless a label is specified at login.
+
+       _a_l_w_a_y_s_-_a_u_d_i_t_-_f_l_a_g_s  Flags  specifying  events  always to be audited for
+			   this user's processes; see aauuddiitt__ccoonnttrrooll(5).
+
+       _n_e_v_e_r_-_a_u_d_i_t_-_f_l_a_g_s   Flags specifying events never  to  be  audited  for
+			   this user's processes; see aauuddiitt__ccoonnttrrooll(5).
+
+       Field  are  separated by a colon, and each user from the next by a NEW-
+       LINE.
+
+       The ppaasssswwdd..aaddjjuunncctt file can also have line beginning with a  `++'  (plus
+       sign),  which means to incorporate entries from the Network Information
+       Service (NIS).  There are three styles of `++' entries: all  by  itself,
+       `++'  means to insert the entire contents of the NIS ppaasssswwdd..aaddjjuunncctt file
+       at that point; ++_n_a_m_e means to insert the entry (if any) for  _n_a_m_e  from
+       the  NIS  service at that point; ++@@_n_a_m_e means to insert the entries for
+       all members of the network group _n_a_m_e at that point.  If  a  `++'  entry
+       has  a non-null password, it will override what is contained in the NIS
+       service.
+
+EEXXAAMMPPLLEE
+       Here is a sample //eettcc//sseeccuurriittyy//ppaasssswwdd..aaddjjuunncctt file:
+
+	      rroooott::qq..mmJJzzTTnnuu88iiccFF..::::::::::::
+	      iiggnnaattzz::77KKssII88CCFFRRPPNNVVXXgg::::bb,,aapp,,bbpp,,ggpp,,ddpp,,iicc,,rr,,dd,,ll::::++ddcc,,++ddaa::--ddrr::
+	      rreexx::77HHUU88UUUUGGRRPPNNVVXXgg::bb,,aapp::bb,,aapp,,bbpp::bb,,bbpp::::++aadd::
+	      ++ffrreedd::99xx..FFFFUUww66xxccJJBBaa::::::::::::
+	      ++::
+
+       The user rroooott is the super-user, who has no special  label  constraints
+       nor audit interest.  The user iiggnnaattzz may have any label from the lowest
+       to the level bb and any of a large number of  categories.   iiggnnaattzz  will
+       run  at	system low unless he specifies otherwise.  He is being audited
+       on the system default event classes  as	well  as  data	creations  and
+       access  changes,  but  never  for  failed data reads.  The user rreexx can
+       function only at the level bb and only in the categories aapp  or  aapp  and
+       bbpp.   By default, he will run at `bb,bbpp'.  He is audited with the system
+       defaults, except that  successful  administrative  operations  are  not
+       audited.   The  user ffrreedd will have the labels and audit flags that are
+       specified in the NIS ppaasssswwdd..aaddjjuunncctt file.  Any other users specified in
+       the NIS service will be able to log in on this system.
+
+       The  user  security  data  file resides in the //eettcc//sseeccuurriittyy directory.
+       Because it contains encrypted passwords, it does not have general  read
+       permission.
+
+FFIILLEESS
+       //eettcc//sseeccuurriittyy//ppaasssswwdd..aaddjjuunncctt
+       //eettcc//sseeccuurriittyy
+
+SSEEEE AALLSSOO
+       llooggiinn(1),  ppaasssswwdd(1),  ccrryypptt(3), ggeettppwwaaeenntt(3), ggeettppwweenntt(3V), aauuddiitt__ccoonn--
+       ttrrooll(5), ppaasssswwdd(5), aadddduusseerr(8)
+
+NNOOTTEESS
+       The Network Information Service (NIS) was formerly known as Sun	Yellow
+       Pages  (YP).   The  functionality of the two remains the same; only the
+       name has changed.
+
+
+
+			       14 December 1987 	     PASSWD.ADJUNCT(5)

@@ -1,0 +1,121 @@
+
+notes concerning password hashes & their use in entdb
+
+Since perl's crypt(3) interface is a pass through to the underlying
+C library, consistent cross platform support for multiple formats
+is not possible - for example, an informal audit of the C libraries
+of several common platforms yields:
+
+  - Linux/glibc (as of RHEL7) will support several formats:
+    - v7/DES
+    - md5 per FreeBSD 2.2
+    - sha256
+    - sha512 (e.g. linux SHA hash[1])
+  - FreeBSD 10 will support (from memory):
+    - v7/DES
+    - md5 
+    - ?
+  - Solaris 11 (from memory):
+    - DES
+    - md5
+    - sha256/512
+  - OpenBSD v5.8 will support:
+    - bcrypt only, even generating errors when traditional DES is requested.
+
+with the variying formats available via the 'modular' hashing method
+as originally implemented on FreeBSD for MD5 passwords, which has
+become a defacto standard on other systems (e.g. salt param keyed
+via '$1$<salt>$' for md5, via '$2$<salt>' for blowfish, etc, with
+the individual 'modules' and their associated hashing 'id' further
+being implementation defined but fairly coordinated within various
+unix implementations
+
+Similarly, available ports and pacakges for suitable perl code to
+generate hashes is lacking, specifically, given the test platforms
+of OpenBSD and Linux, the Authen::Passphrase which seems quite
+comprehensive is not in OpenBSD ports (as of OpenBSD v5.8), whereas
+various Crypt:: modules were both in OpenBSD ports and epel packages.
+Specifically and additionally, no suitable module for generating
+linux-style SHA passwords outside of the Authen::Passphrase package
+was available.
+
+Therefore, at present, the choice was made to:
+
+ - Support md5 via Crypt::PasswdMD5, since this hash is reasonably 
+   secure and available on many common platforms, including linux,
+   and so is a good 'least common denominator'.
+ - Support bcrypt via Crypt::Eksblowfish::Bcrypt, since it is 
+   required for OpenBSD, which is one of the 'reference' platforms
+ - Drop 'native' DES support, since it is weak and libc support has
+   been removed in the case of OpenBSD
+
+Due to the modular nature of the shadow table interface and changing
+status of hashes and perl modules, this might be worth revisiting
+in the future, most specifically upgrading the Linux hashes to use
+a more up to date SHA method.
+
+The multiple hashtype support is provided via the following means:
+
+  - A 'hash_cfg' table is given, mapping 'platform' to 'type'.
+    The string values in platform are used to lookup 'type',
+    and the resulting hashes_<type> table is then used to populate
+    hashes within various portions of code (e.g. shadow file generation).
+    Provided hash tables are:
+
+      - hashes_default
+      - hashes_bcrypt
+      - hashes_md5
+
+  - Native ingest of hashes via the 'loadgetent' subcommand loads
+    hashes from the system into the default, bcrypt, and md5 tables.
+    This obviously implies that data must be invalid since a single
+    hash cannot possibly be in multiple formats, however, since this
+    is the only data available via getent, it is treated as canonical
+    for ingest purposes.
+  - To correct / set hashes, the 'setpassword' command is provided,
+    which stores a valid md5 and bcrypt hash into the appropriate table,
+    and uses the md5 value to populate the 'default' table.
+  - Dumping of files containing hashes uses the hash_cfg dispatch table
+    to populate the resulting data according to the following scheme:
+
+      - <command> : <dispatch platform> -> <default setting>
+      - dumplinuxshadow: linux -> md5
+      - dumpbsdpasswd: bsd -> bcrypt
+      - dumpasswdadjunct: adjunct -> bcrypt
+
+Some reference hashes & testing::
+
+  password of testing123 w/ en_base64(1234123412341234) salt 
+  my $pass='testing123';
+  my $salt='1234123412341234';
+  
+  my $salt64=en_base64($salt);
+  
+  # can use 'raw' salt for md5 - but we have b64, so let's use it.
+  
+  my $md5hash = unix_md5_crypt($pass,$salt64); 
+  my $bhash = bcrypt($pass, '$2a$08$' . $salt64 );
+  
+  print "md5hash: $md5hash\n";
+  print "bhash: $bhash\n";
+
+Yields:
+
+  - salt: KRGxLBCwKxOvKhKyKRGxL.
+  - md5: $1$KRGxLBCw$grLv5WTuMv6.g9IioGzU61
+  - bcrypt: $2a$08$KRGxLBCwKxOvKhKyKRGxL.avjuWzawHlHBjRqW6jhMc5.Zuir/vte
+
+which tested ok for login on RHEL7 and OpenBSD 5.8, respectively 2016-02-10
+
+see also: 
+  - http://www.perlmonks.org/?node_id=198592 
+    'how to use md5?'
+  - http://www.perlmonks.org/?node_id=136698 
+    'Re: Lesson Four, Part 2 of online CGI course'
+  - http://pubs.opengroup.org/onlinepubs/9699919799/functions/crypt.html
+    posix - states 'The algorithm is implementation-defined.'
+  - http://svnweb.freebsd.org/base?view=revision&revision=4246 : \
+    original FreeBSD commit of '$1$' style passwords
+  - http://linux.die.net/man/3/crypt : linux page
+  - https://www.akkadia.org/drepper/sha-crypt.html
+

@@ -1,0 +1,78 @@
+
+NIS Maps
+========
+
+Default/Common libc NIS maps and their NIS 'nicknames' 
+are as follows by platform.
+
+Linux YP Nicknames
+------------------
+
+$ cat /var/yp/nicknames
+passwd          passwd.byname
+group           group.byname
+networks        networks.byaddr
+hosts           hosts.byname
+protocols       protocols.bynumber
+services        services.byname
+aliases         mail.aliases
+ethers          ethers.byname
+
+Solaris (9,10) Nicknames
+------------------------
+
+$ cat /var/yp/nicknames
+passwd passwd.byname
+group group.byname
+project project.byname
+networks networks.byaddr
+hosts hosts.byname
+ipnodes ipnodes.byname
+protocols protocols.bynumber
+services services.byname
+aliases mail.aliases
+ethers ethers.byname
+
+OpenBSD Nicknames
+-----------------
+
+OpenBSD has no nicknames file, instead maps are hardcoded in libc:
+
+$ pwd
+/usr/src/lib
+$ grep '".*\.by' libc/gen/*.c libc/net/*.c
+libc/gen/getgrent.c:                            r = yp_next(__ypdomain, "group.b
+yname",
+libc/gen/getgrent.c:                            r = yp_first(__ypdomain, "group.
+byname",
+libc/gen/getgrent.c:                                        "group.byname", name
+, strlen(name),
+libc/gen/getgrent.c:                                    r = yp_match(__ypdomain,
+ "group.bygid",
+libc/gen/getgrent.c:                            r = yp_match(__ypdomain, "group.
+byname",
+libc/gen/getgrouplist.c:                    !yp_match(__ypdomain, "netid.byname"
+, key,
+libc/gen/getnetgrent.c:                 map = "netgroup.byuser";
+libc/gen/getnetgrent.c:                 map = "netgroup.byhost";
+libc/gen/getpwent.c:    (__has_ypmaster() ? "master.passwd.byname" : "passwd.byn
+ame")
+libc/gen/getpwent.c:    (__has_ypmaster() ? "master.passwd.byuid" : "passwd.byui
+d")
+libc/gen/getpwent.c:    if (yp_first(__ypdomain, "master.passwd.byname",
+libc/net/ethers.c:                      if (yp_match(ypdom, "ethers.byaddr", try
+buf,
+libc/net/ethers.c:                      if (yp_match(ypdom, "ethers.byname", hos
+tname, hostlen,
+
+- note: not sure how amd(8) works here.. though amd itself in-tree
+  only supports  nfs v2 and therefore has file size limitations..
+  for now, am primarily concerned with user/passwd/group here anyhoo
+- basically, as concerns passwords, will use master.passwd if it exists
+  on the server for uid == 0
+  ... side note - caches this across forks but relies on client code
+     to invalidate the cache after uid drop.. however, would probably
+     just lookup on incorrect port.. sooooo secure maps would still
+     be secure, asuming post-fork priveledged code checks are OK.
+
+

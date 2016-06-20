@@ -1,0 +1,89 @@
+
+Netgroup Code
+=============
+
+- No way to list all netgroups via native C calls, which are:
+
+     int
+     getnetgrent(const char **host, const char **user, const char **domain);
+
+     int
+     innetgr(const char *netgroup, const char *host, const char *user,
+         const char *domain);
+
+     void
+     setnetgrent(const char *netgroup);
+
+     void
+     endnetgrent(void);
+
+   With getnetgrent_r available on solaris (10 at least) 
+
+  and their usage being:
+
+    - setnetgrent("groupname");
+    - iterate over getnetgrent to read members
+    - getnetgrent will internally expand recursive netgroups where needed
+
+- OpenBSD has support for local netgroup file, and
+  the netgroup_mkdb source has a native parser for this file in the code.
+
+- Solaris presumably has internal parsers within revnetgroup, etc.
+
+- OpenBSD netgroup_mkdb/revnetgroup:
+  - reads /etc/netgroup .. both have internal parsers which are ifdef'ed 
+    away into private library calls.
+ 
+Therefore:
+
+- only 'cross platform way' to 'list' netgroups is to 
+  either natively parse a local file (which presumes local file),
+  or to use NIS calls, which presumes NIS calls.
+
+- So there is no potential for creating meaningful XS module to
+  iterate over netgroups using library native calls to ingest netgroups
+  into the database as was hoped.
+
+- And instead, will assume local file copy and manual parsing into
+  a database.
+
+Current logic included in is:
+
+  - lib/User/Netgroup.pm: contains a simple parser of plaintext
+      netgroup files
+  - lib/User/EntDB/Netgroup.pm: contains logic to convert/load parsed netgroup
+      files from User::Netgroup to/from SQLite and /etc/netgroup file format.
+
+and does *NOT* include emulation of other libc functions (e.g. setnegrent, etc)
+
+SQL Schema
+==========
+
+Since netgroups have no ID number, can just model as a sloppy 
+grab-bag text table, and 'select * where name =gname;' to get data..
+
+create table netgrent (
+	netgroup text not null,
+	ref text default null,
+	host text default null,
+	user text default null,
+	domain text default null,
+	primary key (netgroup,ref,host,user,domain)
+);
+
+This results in similar problem as actual API, whereby an iterative
+bulk query makes it difficult/less efficient to get list of netgroup
+names, etc, however this problem does follow the same 'accuracy
+of modelling to native files' approach taken in other entdb tables.
+
+An alternative would be a 2-table synthetic storage ala groups/aux_groups
+however this doesn't really match native usage since there is no netgroup id
+number, auxilliary group concept, etc.
+
+Also to note for client code - correct would be to model a DFS expansion
+of netgroup references when iterating, since this matches 'setnetgrent'
+internal behavior, if considering the OpenBSD behavior matching canonical..
+I have not vetted this behavior on other platforms, most specifically
+Solaris (SunOS), which is the origin of netgroups.
+
+
