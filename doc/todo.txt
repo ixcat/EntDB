@@ -2,20 +2,17 @@
 TODO
 ----
 
-- Patched Linux NIS Makefile pointing to /var/yp/ent files
-- Patched OpenBSD NIS Makefile pointing to /var/yp/ent files
-- entdb shell functionality
-- default db path functionality? (or perhaps simply env?)
-- Set correct changedate in bin/dbpasswd
-  fixme: requires expiry storage, and expiry data availability 
-    varies by platform.. 
-    sidenote: math for linux shadow (epoch days):
+- shell command loop functionality
+- Set correct changedate in User:::EntDB::Command::SetPassword
+  - dependant on proper aux data storage for all platforms since no 
+    db record is available.
+  - sidenote: math for linux shadow (epoch days):
       my $now = int ( time/86400 );
 - Password expiration interpretation support in dump routines
   e.g. set /sbin/nologin, invalid hash, or similar in appropriate files
   depending on expiry settings in DB
 - gecos interpolation into generated password files
-- chsh login shell for xplat password changing
+- chsh login shell functionality for xplat password changing
 - Internal OO code cleanup (see todo/oocleanup.txt) to support better object
   subclassing for client-code extensibility.
 - misc future ideas (see todo/ideas.txt)
