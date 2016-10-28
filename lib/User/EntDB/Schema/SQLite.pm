@@ -382,8 +382,14 @@ __DATA__
 Notes concerning schema implementation
 ======================================
 
-common unix functions
----------------------
+common unix function behavior on flatfiles
+------------------------------------------
+
+The entdb utility and database schema should attempt to preserve
+most traditional unix semantics where possible.
+
+The following key functions and their behavior are documented here
+as a reference:
 
 getpwent - iterate sequentially over records in pwent
 getpwnam - get 1st for name string
@@ -393,6 +399,26 @@ getpwuid - get 1st for uid .. hmm nismaps?
 getgrent - sequential reading
 getgrnam - sequential search for name
 getgruid - sequential search for uid
+
+it should be noted that entdb databases built from NIS or other
+directory-based services might result in differing record storage
+than the above behavior would suggest with respect to the input
+source files used to create the database -
+
+For example, if using entdb to distill existing NIS entries:
+
+  1) NIS Input files are stored in expected order
+  2) NIS Maps are built using normal non-entdb procedures, 
+     resulting in different data sequence in above system calls due to
+     database indexing methods in the data storage for the map
+  3) These differing sequences are stored into the resuling entdb.
+
+As the above illustrates, the unexpected sequence of results in the
+generated entdb database is not a bug in entdb itself but instead
+simply a reflection of the upstream source; If original input
+sequences are desired, the input data should be configured into the
+traditional flat-file locations on the system used to build the
+entdb database and then re-run.
 
 Primary vs Auxiliary Groups
 ---------------------------
@@ -425,15 +451,12 @@ system operation, the differentiation of primary vs auxiliary
 groups is and has been an important facet of UNIX system operation
 which should be adhered to in this database model.
 
-todo: document duplicate uid/gid behavior history ..
+Todo: track down and document duplicate uid/gid behavior history - notes:
 
-getgrent(3) ob58:
-    Identical group names
-    or group GIDs may result in undefined behavior.
-no similar message in getpwent .. 
-  and couldn't find origin 
-  of 'toor' accoun as noted in freebsd (no 4.2/4.3BSD /etc/passwd avail)
-
-todo/fixme? 'on default' items -
-... DEFAULT uname value 'unknown user' ->  fixes unknown users 
+ - OpenBSD 5.8 (modern reference):
+   - getgrent(3) ob58 states:
+     Identical group names or group GIDs may result in undefined behavior.
+   - no similar message in getpwent
+ - Couldn't find origin of 'toor' account as configured in freebsd -
+   ( no 4.2/4.3BSD /etc/passwd available at time of writing to cross-check )
 
