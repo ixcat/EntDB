@@ -49,11 +49,11 @@ NFSNOBODYGID=65534
 
 # Should we merge the passwd file with the shadow file ?
 # MERGE_PASSWD=true|false
-MERGE_PASSWD=true
+MERGE_PASSWD=false
 
 # Should we merge the group file with the gshadow file ?
 # MERGE_GROUP=true|false
-MERGE_GROUP=true
+MERGE_GROUP=false
 
 # These are commands which this Makefile needs to properly rebuild the
 # NIS databases. Don't change these unless you have a good reason.
