@@ -28,7 +28,7 @@ sub new {
 		'cmdname' => 'loadkeyvalue',
 		'shorthelp' => 
 		"loadkeyvalue db file [table] [splitrx] [multirx]: "
-		. "load db with key/value data\n",
+		. "load key/value data\n",
 		'longhelp' => $longhelp
 	};
 

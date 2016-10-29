@@ -46,6 +46,9 @@ installdb:
 	${ENTDBCMD} loadgetent ${ENTDBDB}
 	${ENTDBCMD} loadnetgroup ${ENTDBDB}
 	${ENTDBCMD} loadmailaliases ${ENTDBDB} ${SRCALIASES}
+	[ "`uname -s`" = "Linux" ] \
+		&& ${ENTDBCMD} loadlinuxaux ${ENTDBDB} \
+		|| exit 0;
 	install -m 750 -o root -g 0 ${SRCMK} \
 		${ENTDIR}/Makefile
 

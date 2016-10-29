@@ -39,7 +39,7 @@ return <<'__EOSCHEMA'
 -- users: user 'definitions' (e.g. 1:1 /etc/passwd data)
 
 create table users(
-	uname text not null, 
+	name text not null, 
 	passwd text default '*',
 	uid integer not null,
 	gid integer not null,
@@ -47,7 +47,7 @@ create table users(
 	dir text default '/',
 	shell text default '/sbin/nologin',
 	foreign key(gid) references groups(gid),
-	primary key (uname,uid)
+	primary key (name,uid)
 );
 
 -- password hash type dispatch
@@ -75,18 +75,31 @@ insert into hash_cfg values ('adjunct','md5');
 -- for use in client programs.
 
 create table hashes_default (
-	uname text not null primary key,
+	name text not null primary key,
 	passwd text not null default '*'
 );
 
 create table hashes_md5 (
-	uname text not null primary key,
+	name text not null primary key,
 	passwd text not null default '*'
 );
 
 create table hashes_bcrypt (
-	uname text not null primary key,
+	name text not null primary key,
 	passwd text not null default '*' 
+);
+
+-- linux /etc/shadow auxillary information (pwhashes in hash_* tables)
+
+create table aux_users_linux(
+	name text not null,
+	lastchg integer,
+	minage integer,
+	maxage integer,
+	warning integer,
+	inactivity integer,
+	expiration integer,
+	reserved integer
 );
 
 -- groups: group 'definitions' (e.g. 1:1 /etc/group fields 1-2)
@@ -102,26 +115,26 @@ create table groups(
 
 create table aux_groups(
 	gid integer,
-	uname text,
+	name text,
 	foreign key(gid) references groups(gid),
-	foreign key(uname) references users(uname),
-	primary key (gid,uname)
+	foreign key(name) references users(name),
+	primary key (gid,name)
 );
 
 --
 -- etc_group:
 --
--- returns multiple gname:gid:uname records per group,
+-- returns multiple gname:gid:name records per group,
 -- summing to the total of the contents of all auxilliary groups - e.g.:
 --
--- group1:gid1:uname1
--- group1:gid1:uname2
+-- group1:gid1:name1
+-- group1:gid1:name2
 -- group1:gid1:...
--- group1:gid1:unameN
+-- group1:gid1:nameN
 -- ...
--- groupN:gidN:uname1
+-- groupN:gidN:name1
 -- groupN:gidN:...
--- groupN:gidN:unameN
+-- groupN:gidN:nameN
 --
 -- Groups are in GID sequential order, and group members are be returned 
 -- in order of insert. It should be noted that this inherently implies 
@@ -146,12 +159,12 @@ create table aux_groups(
 --
 
 create view etc_group as
-select gname,gid,uname from (
+select gname,gid,name from (
 select
 	ag.rowid as rowid,
         g.gname as gname,
         g.gid as gid,
-        ag.uname as uname
+        ag.name as name
 from
         groups g,
         aux_groups ag
@@ -162,7 +175,7 @@ select
 	-1 as rowid,
         gname,
         gid,
-        null as uname
+        null as name
 from
         groups
 where
@@ -195,7 +208,7 @@ order by
 --
 
 create view user_group_map as
-select 	distinct(nu.uname) uname,
+select 	distinct(nu.name) name,
 	nu.uid uid,
 	nu.gid gid,
 	nu.pgname pgname,
@@ -206,7 +219,7 @@ from
 	aux_groups ag,
 	(
 		select 
-			u.uname uname,
+			u.name name,
 			u.uid uid,
 			u.gid gid,
 			g.gname pgname
@@ -217,11 +230,11 @@ from
 			u.gid = g.gid 
 	) nu
 where
-	nu.uname = ag.uname
+	nu.name = ag.name
 and
 	g.gid = ag.gid
 union
-select  distinct(nu.uname) uname,
+select  distinct(nu.name) name,
 	nu.uid uid,
 	nu.gid gid,
 	nu.pgname pgname,
@@ -230,7 +243,7 @@ select  distinct(nu.uname) uname,
 from
 	        (
                 select
-                        u.uname uname,
+                        u.name name,
                         u.uid uid,
                         u.gid gid,
                         g.gname pgname
@@ -241,13 +254,13 @@ from
                         u.gid = g.gid
         ) nu
 where 
-	uname
+	name
 not in (
-	select distinct(uname)
+	select distinct(name)
 	from aux_groups
 )
 order by
-nu.uname 
+nu.name 
 asc;
 
 
@@ -319,12 +332,12 @@ return <<'__EOTEST'
 -- 
 
 
--- v7: uname, passwd, uid, gid, gecos, dir, shell
+-- v7: name, passwd, uid, gid, gecos, dir, shell
 
-insert into users (uname, uid, gid) values ('u1',1,20);
-insert into users (uname, uid, gid) values ('u1',2,20);
-insert into users (uname, uid, gid) values ('u2',2,20);
-insert into users (uname, uid, gid) values ('u2',3,20);
+insert into users (name, uid, gid) values ('u1',1,20);
+insert into users (name, uid, gid) values ('u1',2,20);
+insert into users (name, uid, gid) values ('u2',2,20);
+insert into users (name, uid, gid) values ('u2',3,20);
 
 insert into groups values ('wheel',0);
 insert into groups values ('users',10);
@@ -342,8 +355,8 @@ delete from aux_groups;
 
 -- now, 'clean' data
 
-insert into users (uname, uid, gid) values ('u1',1,20);
-insert into users (uname, uid, gid) values ('u2',2,20);
+insert into users (name, uid, gid) values ('u1',1,20);
+insert into users (name, uid, gid) values ('u2',2,20);
 
 insert into groups values ('wheel',0);
 insert into groups values ('users',10);
@@ -391,14 +404,14 @@ most traditional unix semantics where possible.
 The following key functions and their behavior are documented here
 as a reference:
 
-getpwent - iterate sequentially over records in pwent
-getpwnam - get 1st for name string
-getpwuid - get 1st for uid .. hmm nismaps? 
-  ... (built by getpwent? keyed sequentially?)
+  getpwent - iterate sequentially over records in pwent
+  getpwnam - get 1st for name string
+  getpwuid - get 1st for uid .. hmm nismaps? 
+    ... (built by getpwent? keyed sequentially?)
 
-getgrent - sequential reading
-getgrnam - sequential search for name
-getgruid - sequential search for uid
+  getgrent - sequential reading
+  getgrnam - sequential search for name
+  getgruid - sequential search for uid
 
 it should be noted that entdb databases built from NIS or other
 directory-based services might result in differing record storage
@@ -453,10 +466,10 @@ which should be adhered to in this database model.
 
 Todo: track down and document duplicate uid/gid behavior history - notes:
 
- - OpenBSD 5.8 (modern reference):
-   - getgrent(3) ob58 states:
-     Identical group names or group GIDs may result in undefined behavior.
-   - no similar message in getpwent
- - Couldn't find origin of 'toor' account as configured in freebsd -
-   ( no 4.2/4.3BSD /etc/passwd available at time of writing to cross-check )
+  - OpenBSD 5.8 (modern reference):
+    - getgrent(3) ob58 states:
+      Identical group names or group GIDs may result in undefined behavior.
+    - no similar message in getpwent
+  - Couldn't find origin of 'toor' account as configured in freebsd -
+    ( no 4.2/4.3BSD /etc/passwd available at time of writing to cross-check )
 

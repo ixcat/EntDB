@@ -14,6 +14,7 @@ use warnings;
 use User::grent;
 
 sub new;
+sub fromGrec;
 sub fromGrent;
 
 sub toSQLite;
@@ -33,10 +34,24 @@ sub new {
 	return $self;
 }
 
-sub fromGrent {
+sub fromGrec { # construct from k:v hash of User::grent-like attributes
+	my $self = User::EntDB::Group->new();
+	my $grec = shift;
+	$self->{grent} = $grec;
+	return $self;
+}
+
+sub fromGrent { # construct from actual User::grent objects
 	my $self = User::EntDB::Group->new();
 	my $grent = shift;
-	$self->{grent} = $grent;
+	my $grec = {};
+
+	$grec->{name} = $grent->name();
+	$grec->{gid} = $grent->gid();
+	$grec->{members} = $grent->members();
+
+	$self->{grent} = $grec;
+
 	return $self;
 }
 
@@ -50,9 +65,9 @@ sub toSQLite {
 
 	my ($name,$gid,$members);
 
-	$name = $grent->name;
-	$gid = $grent->gid;
-	$members = $grent->members;
+	$name = $grent->{name};
+	$gid = $grent->{gid};
+	$members = $grent->{members};
 
 	my $q = "insert into groups values ("
 		. "'" . $name . "'"
@@ -94,7 +109,7 @@ sub getDBGroupList { # static. returns arrray of objs from DB
 	my $glist = [];
 
 	while(my $g = $entdb->getgrent()) {
-		push @{$glist}, User::EntDB::Group::fromGrent($g);
+		push @{$glist}, User::EntDB::Group::fromGrec($g);
 	}
 	return $glist;
 }

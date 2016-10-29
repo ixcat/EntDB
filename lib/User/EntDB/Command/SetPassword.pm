@@ -152,7 +152,7 @@ sub _setpass {
 	my $entdb = User::EntDB->new($file) or return undef;
 
 	return $entdb->storehashes({
-		uname => $user,
+		name => $user,
 		hashes => $hashes
 	});
 }

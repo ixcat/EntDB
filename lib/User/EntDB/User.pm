@@ -4,6 +4,19 @@
 # user representation class
 # partial-(view)wrapper around User::pwent currently
 #
+# TODO: 
+#
+# EntDB::User uses User::pwent for ingest but hashes for dumps
+# ... and fields are inconsistent btw User::pwent & database struct items
+# ... so needs rework in schema, object use, possible doc updates
+#     and potentially emulation of User::pwent api later if hoping to
+#     keep this compatible.
+#     ... think for now, the usage was simply incongruent since were only
+#         dealing with completely separate load/store operations.
+#         now, since we are synthesizing new records in UserAdd.pm,
+#         need proper support for code generated records, which highlights
+#         the problem with the previous approaches.
+#
 # NOTE/FIXME:
 #
 #   - password multi-hash storage currently somewhat hacked on -
@@ -17,9 +30,12 @@ package User::EntDB::User;
 use strict;
 use warnings;
 
+use Carp;
+
 use User::pwent;
 
 sub new;
+sub fromPrec;
 sub fromPwent;
 
 sub toSQLite;
@@ -39,6 +55,7 @@ sub getDBUserList;
 sub getSysUserList; 
 
 sub loadAllUsersFromSystem;
+sub loadAllLinuxAuxDataFromSystem;
 
 sub convertUserListToSQL;
 
@@ -48,14 +65,33 @@ sub convertUserListToSQL;
 sub new {
 	my $class = shift;
 	my $self = {};
+	$self->{pwent} = undef;
 	bless $self,$class;
 	return $self;
 }
 
-sub fromPwent {
+sub fromPrec { # construct from k:v hash of User::pwent-like attributes
+	my $self = User::EntDB::User->new();
+	my $prec = shift;
+	$self->{pwent} = $prec;
+	return $self;
+}
+
+sub fromPwent { # construct from actual User::pwent objects
 	my $self = User::EntDB::User->new();
 	my $pwent = shift;
-	$self->{pwent} = $pwent;	
+	my $prec = {};
+
+	$prec->{name} = $pwent->name();
+	$prec->{passwd} = $pwent->passwd();
+	$prec->{uid} = $pwent->uid();
+	$prec->{gid} = $pwent->gid();
+	$prec->{gid} = $pwent->gid();
+	($prec->{gecos} = $pwent->gecos()) =~ s:':'':; # escape hyphens
+	$prec->{dir} = $pwent->dir();
+	$prec->{shell} = $pwent->shell();
+
+	$self->{pwent} = $prec;	
 	return $self; 
 }
 
@@ -68,13 +104,13 @@ sub toSQLite {
 	my $pwent = $self->{pwent};
 
 	# v7 fields for max compat.
-	my $name = $pwent->name;
-	my $passwd = $pwent->passwd;
-	my $uid = $pwent->uid;
-	my $gid = $pwent->gid;
-	(my $gecos = $pwent->gecos) =~ s:':'':; # escape commas
-	my $dir = $pwent->dir;
-	my $shell = $pwent->shell;
+	my $name = $pwent->{name};
+	my $passwd = $pwent->{passwd};
+	my $uid = $pwent->{uid};
+	my $gid = $pwent->{gid};
+	my $gecos = $pwent->{gecos};
+	my $dir = $pwent->{dir};
+	my $shell = $pwent->{shell};
 
 	my $q .= "insert into users values ("
 	. "'" . $name . "'"
@@ -94,7 +130,7 @@ sub toBSDPasswd {
 	my $self = shift;
 	my $p = $self->{pwent};
 	
-	my $r = $p->{uname}
+	my $r = $p->{name}
 	. ':' . $p->{passwd}
 	. ':' . $p->{uid}
 	. ':' . $p->{gid}
@@ -112,8 +148,8 @@ sub toLinuxPasswd {
 	my $self = shift;
 	my $p = $self->{pwent};
 
-	my $r = $p->{uname}
-		. ':##' . $p->{uname}
+	my $r = $p->{name}
+		. ':##' . $p->{name}
 		. ':' . $p->{uid}
 		. ':' . $p->{gid}
 		. ':' . $p->{gecos}
@@ -127,15 +163,20 @@ sub toLinuxShadow {
 	my $self = shift;
 	my $p = $self->{pwent};
 
-	my $r = $p->{uname}
+	my $fix = sub {
+		return defined($_[0]) ? $_[0] : $_[1];
+	};
+
+	my $r = $p->{name}
 		. ':' . $p->{passwd}
-		. ':1' # lastchange - 0 implies changenow
-		. ':0' # minage
-		. ':99999' # empty disables aging
-		. ':7' # expiry warning period
-		. ':' # inactivity grace period - blank off
-		. ':' # expiry date (unixdays)
-		. ':'; # reserved
+		. ":" . $fix->($p->{lastchg},'1')
+		. ":" . $fix->($p->{minage},'0')
+		. ":" . $fix->($p->{maxage},'99999') # 0 -> disable
+		. ":" . $fix->($p->{warning},'7')
+		. ":" . $fix->($p->{inactivity},'') # blank -> off
+		. ":" . $fix->($p->{expiration},'')
+		. ":" . $fix->($p->{reserved},'')
+	;
 
 	return $r;
 }
@@ -144,7 +185,7 @@ sub toPasswdAdjunct {
 	my $self = shift;
 	my $p = $self->{pwent};
 
-	my $r = $p->{uname}
+	my $r = $p->{name}
 		. ':' . $p->{passwd}
 		. ':' # min-label
 		. ':' # max-label
@@ -161,7 +202,7 @@ sub getDBUserList {
 	my $ulist = [];
 
 	while(my $u = $entdb->getpwent()) {
-		push @{$ulist}, User::EntDB::User::fromPwent($u);
+		push @{$ulist}, User::EntDB::User::fromPrec($u);
 	}
 	return $ulist;
 }
@@ -186,15 +227,60 @@ sub convertUserListToSQL { # generate array of SQL cmds to build user tables
 		push @{$sqlist}, $stmt;
 	}
 
+	# FIXME : race condition on secondary updates 
+	# hashes will be zapped on second call of this function on same DB
+	# .. so now using temp table - but will yield dupes..
+
+	push @{$sqlist},
+		"create temporary table _convertUserListToSQLu"
+		. " (user text);\n"
+	;
+
+	foreach my $u (@{$ulist}) {
+		push @{$sqlist}, "insert into _convertUserListToSQLu"
+			. "(user) values ('" . $u->{pwent}->{name} . "');\n";
+	}
+
 	push @{$sqlist}, 
-		"insert into hashes_default select uname,passwd from users;\n";
-	push @{$sqlist},
-		"insert into hashes_bcrypt select uname,passwd from users;\n";
-	push @{$sqlist},
-		"insert into hashes_md5 select uname,passwd from users;\n";
+		"delete from hashes_default where name in"
+		. " (select * from _convertUserListToSQLu)"
+		. ";\n"
+	;
+	push @{$sqlist}, 
+		"insert into hashes_default select name,passwd from users"
+		. " where name in (select * from _convertUserListToSQLu)"
+		. ";\n"
+	;
+
+	push @{$sqlist}, 
+		"delete from hashes_bcrypt where name in"
+		. " (select * from _convertUserListToSQLu)"
+		. ";\n"
+	;
+	push @{$sqlist}, 
+		"insert into hashes_bcrypt select name,passwd from users"
+		. " where name in (select * from _convertUserListToSQLu)"
+		. ";\n"
+	;
+
+	push @{$sqlist}, 
+		"delete from hashes_md5 where name in"
+		. " (select * from _convertUserListToSQLu)"
+		. ";\n"
+	;
+	push @{$sqlist}, 
+		"insert into hashes_md5 select name,passwd from users"
+		. " where name in (select * from _convertUserListToSQLu)"
+		. ";\n"
+	;
 
 	# todo: verify adjunct '*' properly works before deploying this..
-	push @{$sqlist}, "update users set passwd= '##' || uname;\n";
+	push @{$sqlist}, "update users set passwd= '##' || name"
+		. " where name in (select * from _convertUserListToSQLu)"
+		. ";\n"
+	;
+
+	push @{$sqlist}, "drop table _convertUserListToSQLu;\n";
 
 	return $sqlist;
 }
@@ -215,4 +301,60 @@ sub loadAllUsersFromSystem { # full getent->sqlite conversion of all users
 	$entdb->endtxn();
 }
 
+sub loadAllLinuxAuxDataFromSystem {
+	my $fname = shift;
+
+	return undef unless $fname;
+
+	my $entdb = User::EntDB->new($fname);
+
+	if ($^O ne 'linux') {
+		carp "loadAllLinuxAuxDataFromSystem on non-linux system..";
+		return 1;
+	}
+
+	my $gefh = undef;
+	if(!open($gefh, "getent shadow |" )) {
+		$gefh = undef;
+		return $gefh;
+	}
+
+	# fields
+	my $name = 0;		# accountname
+	my $passwd = 1;		# enc pass (not used here - see hash tables)
+	my $lastchg = 2;	# last change
+	my $minage = 3;		# min days before rechange
+	my $maxage = 4;		# max days before change
+	my $warning = 5;	# pending change warning days
+	my $inactivity = 6;	# days allowed after expire
+	my $expiration = 7;	# account expiration date
+	my $reserved = 8;	# unused
+
+	my $fix = sub {
+		return defined($_[0]) ? $_[0] : $_[1];
+	};
+
+	$entdb->begintxn();
+	while (<$gefh>) {
+		chomp;
+		my $items = [ split /:/, $_ ];
+
+		my $q = "insert into aux_users_linux values ("
+			. $fix->("'" . $items->[$name] . "'",'null') . ","
+			. $fix->($items->[$lastchg],'null'). ","
+			. $fix->($items->[$minage],,'null') . ","
+			. $fix->($items->[$maxage],'null') . ","
+			. $fix->($items->[$warning],'null') . ","
+			. $fix->($items->[$inactivity],'null') . ","
+			. $fix->($items->[$expiration],'null') . ","
+			. $fix->($items->[$reserved],'null')
+		. ");\n";
+		$entdb->do($q);
+	}
+	$entdb->endtxn();
+
+	my $err = 0;
+}
+
 1;
+

@@ -117,6 +117,44 @@ passwd should get all data (for e.g. uid lookups):
   # tail -n 1 /etc/passwd
   +
 
+Correct use of Linux /etc/shadow nss_compat selectors:
+
+Reference shadow fields are::
+
+  # name:pass:lastchange:minage:maxage:warning:inactivity:expiredate:reserved
+
+Where:
+
+   - name: accountname
+   - pass: enc pass
+   - lastchange: last change date (unixepoch days)
+   - minage: minimum days before next change (empty/0 -> none)
+   - maxage: maximum days before next change (empty/0 -> disabled)
+   - warning: warning days before expiry (0 -> nowarn)
+   - inactivity: days valid expiry where login/forced chg allowed (0->none)
+   - expiration date: days valid expiry where login/forced chg allowed (0->none)
+   - reserved: unused
+
+note: maxage disabled disables warning/inactivity/expiration functionality.
+
+Since '0' (aka 'empty') has a meaning in the warning, inactivity,
+and expiration fields, the value '-1' is used to imply pass-through
+to the 'compat' NIS query [#]_.
+
+Therefore, for NIS 'compat' selectors to pass through if wanting to override
+a single field, the resulting template string is::
+
+  +::0:0:0:-1:-1:-1:
+
+Rather than simply::
+
+  +::::::::
+
+So, in the case of blocking all password hashes, the 'correct' passthrough
+setting is:
+
+  +:*:0:0:0:-1:-1:-1:
+
 for all users allowed, allow all shadow records:
 
   # tail -n 1 /etc/shadow
@@ -127,6 +165,15 @@ for a certain netgroup allowed, allow only the group and block rest
   # tail -n 2 /etc/shadow
   +@foo::::::
   +:*:::::/sbin/nologin
+
+Since linux shadow account expiry information is not common to all
+platforms, it must be either generated manually or loaded separately
+from the common data using the 'loadlinuxaux' command. Password
+hashes are loaded generically via the 'loadgetent' command and
+will work without having taken this step.
+
+.. [#] At the time of writing (rhel7 currency), this behavior is defined
+in the function copy_spwd_changes() of glibc 2.17's compat-spwd.c.
 
 OpenBSD
 ~~~~~~~

@@ -23,8 +23,10 @@ use User::EntDB::Command::PrintSchema;
 use User::EntDB::Command::LoadGetent;
 use User::EntDB::Command::LoadMailAliases;
 use User::EntDB::Command::LoadKeyValue;
+use User::EntDB::Command::LoadLinuxAux;
 use User::EntDB::Command::LoadNetgroup;
 
+use User::EntDB::Command::UserAdd;
 use User::EntDB::Command::SetPassword;
 
 use User::EntDB::Command::DumpBSDPasswd;
@@ -36,6 +38,7 @@ use User::EntDB::Command::DumpLinuxShadow;
 use User::EntDB::Command::DumpNetgroup;
 use User::EntDB::Command::DumpPasswdAdjunct;
 
+
 (my $me = $0) =~ s:.*/::;
 
 my $app = User::EntDB::Command->new({
@@ -46,7 +49,9 @@ my $app = User::EntDB::Command->new({
 		'User::EntDB::Command::LoadGetent',
 		'User::EntDB::Command::LoadNetgroup',
 		'User::EntDB::Command::LoadMailAliases',
+		'User::EntDB::Command::LoadLinuxAux',
 		'User::EntDB::Command::LoadKeyValue',
+		'User::EntDB::Command::UserAdd',
 		'User::EntDB::Command::SetPassword',
 		'User::EntDB::Command::DumpBSDPasswd',
 		'User::EntDB::Command::DumpLinuxPasswd',

@@ -1,7 +1,7 @@
 
 package User::EntDB;
 
-$VERSION = 0.01;
+$VERSION = 0.02;
 
 use strict;
 use warnings;
@@ -43,25 +43,26 @@ sub storehashes;	# store password hashes in db
 #   getpwent/getgrent simply query all available records on 1st use,
 #   and then return individual results until/unless setpwent/setgrent
 #   is called to repeat the query. 
+#
 
 sub getpwent;
 sub getpwnam;
 sub getpwuid;
 sub setpwent;
 
+# pw aux data functions - not merged directly w/'pure' pwent calls
+sub _aux_users_linux_fetchall;
+
 sub getgrent;
 sub getgrnam;
-sub getgruid;
+sub getgrgid;
 sub setgrent;
 
-sub nextnetgrent;	# INPROG
+sub nextnetgrent;
 sub getnetgrent;	# NI (dependant on _ng_addgroup for expansion 1st)
 sub innetgr;		# NI
-sub setnetgrent;	# INPROG (for local 'null' arg version)
+sub setnetgrent;
 sub endnetgrent;	# NI
-sub _ng_addgroup;	# expansion routine in OB, called from setnetgrent
-sub _ng_lookup;		# called within addgroup to get raw group data per group
-sub _ng_fetchall;	# local raw data query
 
 # generic key/value tables
 
@@ -81,6 +82,10 @@ sub new {
 
 	$self->{npwents} = undef;
 	$self->{pwents} = undef;
+
+	# gets zapped, but ensure ok since is *aux* & shouldn't be 
+	# relied on to test presents/absence of data in pwents
+	$self->{lxauxents} = {}; 
 
 	$self->{ngrents} = undef;
 	$self->{grents} = undef;
@@ -191,6 +196,23 @@ sub endtxn {
 # - assumption that all defined tables have some value for valid users
 #   so 'update' statement works
 # - use of hardcoded md5 in bin/dbpass 
+# 
+# docv2wip:
+#
+# - different hash types are stored in hashes_<type> table
+# - client code can ->sethashfmt(), which will influence further setpwent calls
+# - if not set, 'desired' format is set to 'default',
+#   which is a dispatch lookup in hash_cfg table, pointing to desired
+#   actual format table.
+# - this tablename is interpolated in password query join,
+#   loading appropriate hash format in the resulting structure
+# - perhaps ideally will use 'system profiles' rather than manually
+#   configuring various attributes - e.g. 'setfmt: linux'
+#   configures hashes *and* aux data
+#   one thing of note is that hash data is guaranteed consistent w/r/t
+#   nrecords, and 1:1 username:hash records - so join works;
+#   adding in aux recors inconsistently will break joins and result
+#   in incomplete result sets.
 #
 
 sub sethashfmt {
@@ -242,7 +264,7 @@ sub storehashes {
 	my ($self, $args) = @_;
 	my $dbh = $self->{dbh};
 
-	my ($uname);
+	my ($name);
 
 	if(!$dbh) {
 		carp "storehashes on unconnected object";
@@ -253,8 +275,8 @@ sub storehashes {
 
 	# verify user exists (and eventually, is not *deliberately* locked)
 
-	$uname = $args->{uname};
-	return 1 unless $self->getpwnam($uname); # FIXME: ENOENT
+	$name = $args->{name};
+	return 1 unless $self->getpwnam($name); # FIXME: ENOENT
 
 	# and update password for all hash types
 
@@ -263,10 +285,10 @@ sub storehashes {
 		my $sth = $dbh->prepare("
 			update hashes_$fmt
 			set passwd=? 
-			where uname=?
+			where name=?
 		");
 	
-		my $result = $sth->execute($hpw,$uname);
+		my $result = $sth->execute($hpw,$name);
 		return 1 if $result < 1;
 	}
 
@@ -306,7 +328,7 @@ sub getpwnam {
 	}
 	if ($npwents > 0) {
 		foreach my $ent (@{$self->{pwents}}) {
-			return $ent if $ent->{uname} eq $desired;
+			return $ent if $ent->{name} eq $desired;
 		}
 		return undef; # done iterating
 	}
@@ -315,9 +337,14 @@ sub getpwnam {
 
 sub getpwuid; # TODO
 
+# XXX: hacking in aux_users array queries here by default -
+#   these can be then utilized by appropriate client code when needed 
+#   see other pwhash notes above
+
 sub setpwent { # setpwent: reset internal pwent handle
+
 	my $self = shift;
-	my ($dbh,$sth,$fmttab,$pwents);
+	my ($dbh,$sth,$fmttab,$pwents,$lxauxents);
 
 	$dbh = $self->{dbh};
 
@@ -329,11 +356,11 @@ sub setpwent { # setpwent: reset internal pwent handle
 	$self->_checkhashfmt();
 	$fmttab = $self->{fmttab};
 
-	$sth = $dbh->prepare("
-		select u.uname, p.passwd, u.uid, u.gid, u.gecos, u.dir, u.shell
-		from users u, hashes_$fmttab p
-		where u.uname = p.uname
-	");
+ 	$sth = $dbh->prepare("
+ 		select u.name, p.passwd, u.uid, u.gid, u.gecos, u.dir, u.shell
+ 		from users u, hashes_$fmttab p
+ 		where u.name = p.name
+ 	");
 
 	$sth->execute;
 
@@ -341,12 +368,33 @@ sub setpwent { # setpwent: reset internal pwent handle
 
 	if(!defined($pwents)) {
 		$self->{npwents} = undef;
+		return;
 	}
-	else {
-		$self->{npwents} = scalar $pwents;
+	$self->{npwents} = scalar $pwents;
+	$self->{pwents} = $pwents;
+
+	$sth = $dbh->prepare("select * from aux_users_linux");
+	$sth->execute;
+	$self->{lxauxents} = $sth->fetchall_arrayref({});
+
+
+}
+
+sub _aux_users_linux_fetchall {
+	my $self = shift;
+
+	my $dbh = $self->{dbh};
+
+	if(!$dbh){ 
+		carp "_lnx_aux_fetchall on unconnected object";
+		return 1;
 	}
 
-	$self->{pwents} = $pwents;
+	my $sth = $dbh->prepare("select * from aux_users_linux");
+
+	$sth->execute;
+
+	return $sth->fetchall_arrayref({}); # return tmp hashes
 }
 
 sub getgrent { # getgrent: 
@@ -367,6 +415,49 @@ sub getgrent { # getgrent:
 	else {
 		return undef; # done iterating
 	}
+}
+
+sub getgrnam { # get group by name
+	my $self = shift;
+
+	my ($gname,$dbh,$sth,$tgrents,$group) = undef;
+
+	$gname = shift or return undef;
+
+	$dbh = $self->{dbh};
+
+	if(!$dbh){
+		carp "getgrnam on unconnected object";
+		return undef;
+	}
+
+	$sth = $dbh->prepare("select * from etc_group where gname=?");
+	$sth->bind_param(1,$gname);
+
+	$sth->execute;
+
+	$tgrents = $sth->fetchall_arrayref({});
+
+	my $nres = 0;	
+	foreach(my $tg = shift @{$tgrents}) {
+		if ($nres++ == 0) {
+			$group->{name} = $gname;
+			$group->{gid} = $tg->{gid};
+			$group->{members} = [];
+
+			push @{$group->{members}}, $tg->{uname}
+				if exists($tg->{uname});
+		}
+		else {
+			push @{$group->{members}}, $tg->{uname};
+		}
+	}
+
+	return $group;;
+}
+
+sub getgrgid { # get group by gid
+	return undef;
 }
 
 sub setgrent { # setgrent: reset internal grent handle
@@ -406,7 +497,7 @@ sub setgrent { # setgrent: reset internal grent handle
 
 	 		$gn = $tg->{gname};
 	 		$gi = $tg->{gid};
-	 		$un = $tg->{uname};
+	 		$un = $tg->{name};
 
 			if(!defined $hgrents->{$gn}) { # make actual grent
 				$hgrents->{$gn} = {
@@ -507,62 +598,6 @@ sub setnetgrent {
 	$self->{nnetgrents} = scalar $ret;
 	$self->{netgrents} = $ret;
 
-}
-
-
-
-# fetch all data from netgroup table
-
-sub _ng_fetchall  {
-
-	my $self = shift;
-	my ($dbh,$sth,$rows,$seq,$ngs,$ret);
-
-	$dbh = $self->{dbh};
-
-	if(!$dbh){ 
-		carp "_ng_fetchall on unconnected object";
-		return undef;
-	}
-
-	$sth = $dbh->prepare("select * from netgrent");
-
-	$sth->execute;
-
-	$rows = $sth->fetchall_arrayref({}); # return tmp hashes
-
-	return undef if scalar $rows < 1;
-
-	$seq = [];
-	$ngs = {};
-	$ret = [];
-
-	foreach my $row (@{$rows}) {
-		my $ngname = $row->{netgroup};
-
-		my $mem = {
-			'ref' => $row->{ref},
-			'host' => $row->{host},
-			'user' => $row->{user},
-			'domain' => $row->{domain}
-		};
-
-		if(!exists $ngs->{$ngname}) {
-			$ngs->{$ngname} = {
-				'netgroup' => $ngname,
-				'entries' => [ $mem ]
-			};
-			push @{$seq}, $ngname;
-		}
-		else {
-			push @{$ngs->{$ngname}->{entries}}, $mem;
-		}
-	}
-
-	foreach my $ngname (@{$seq}) {
-		push @{$ret}, $ngs->{$ngname};
-	}
-	return $ret;
 }
 
 sub _kv_fetchall {

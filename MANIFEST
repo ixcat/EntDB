@@ -14,6 +14,7 @@ doc/todo.txt
 doc/entdb.mk
 doc/todo/ideas.txt
 doc/todo/oofixup.txt
+doc/todo/usermod.txt
 lib/User/Netgroup.pm
 lib/User/EntDB/KeyValue.pm
 lib/User/EntDB/Netgroup.pm
@@ -38,8 +39,11 @@ lib/User/EntDB/Command/CreateDatabase.pm
 lib/User/EntDB/Command/DumpGroup.pm
 lib/User/EntDB/Command/LoadNetgroup.pm
 lib/User/EntDB/Command/DumpNetgroup.pm
+lib/User/EntDB/Command/LoadLinuxAux.pm
+lib/User/EntDB/Command/UserAdd.pm
 lib/User/EntDB.pm
 MANIFEST
 t/Netgroup.t
 t/KeyValue.t
 t/t.txt
+t/UserAdd.t

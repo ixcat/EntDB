@@ -43,7 +43,7 @@ other similar items)
     instead of:
 
       while($u = $EntDB->getpwent()) {
-	print $u->{uname} ... "yadda yadda"
+	print $u->{name} ... "yadda yadda"
       }
 
     however, this means db objects are roughly equiv. to 'base' User::pwent,

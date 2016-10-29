@@ -31,7 +31,7 @@ sub new {
 		'cmdname' => 'dumpkeyvalue',
 		'shorthelp' => 
 		"dumpkeyvalue db [multi] [table] [fmtstr]: "
-		. "dump K/V data in db table with fmtstr\n",
+		. "dump K/V data\n",
 		'longhelp' => $longhelp
 	};
 

@@ -1,0 +1,50 @@
+
+User-managed account configuration notes -
+
+Linux-style script is not portable:
+
+  - linux rpc.yppasswdd subcommand protocol is linux specific,
+    tangentially relies on DES crypt() checking as well (which is
+    also not common to e.g. OpenBSD, which has removed it.
+
+  - Other libre systems only implement 'alternate password dir'
+    rather than script at best in their rpc.yppasswdd implying no
+    simple way to update the backend database without bidirectional
+    sync (db->files for new users vs files->db for user updates)
+
+Therefore, 
+
+Need a script to change passwords interactively & will set as login
+shell for all users on nis server box - to change, ssh to NIS box.
+
+Ideally, this would be limited and spawn a subprogram / copy of
+itself via e.g. sudo with cleanly sanitized input to do the actual
+changing rather than giving user priveledged process direct access
+to user input.
+
+Platform Notes:
+
+  - Linux notes:
+
+    -E program 
+
+     sets env YP_PASSWD_OLD, YP_PASSWD_NEW, YP_USER, 
+              YP_GECOS,  YP_SHELL
+
+    -x program 
+
+      stdin/stdout / pipe style protocol
+ 
+  - OpenBSD:       
+
+    - zapped rpc.yppasswdd - has login_lchpass class helper gizmo
+      (e.g. ssh to nis server, run this)
+
+  - NetBSD:
+    - only '-d' option for alternate directory
+
+  - FreeBSD:
+
+    - many featuers: multidomain, alternate dir. but no external 
+      script option
+
