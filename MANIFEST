@@ -12,6 +12,9 @@ doc/ref/netgroups.txt
 doc/entdb.txt
 doc/todo.txt
 doc/entdb.mk
+doc/linux.mk
+doc/obsd.mk
+doc/verif.mk
 doc/todo/ideas.txt
 doc/todo/oofixup.txt
 doc/todo/usermod.txt
