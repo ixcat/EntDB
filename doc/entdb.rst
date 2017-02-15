@@ -1,4 +1,3 @@
-.. $Id$
 
 =====
 entdb
@@ -30,17 +29,17 @@ client/server mode, and on solaris9-11 clients.
 
 Important security notes:
 
-Due to lack of common portable perl modules and in order to maximize
-cross platform compatibility, this module uses md5 password hashes
-on Linux and Solaris by default. Although collisions have been
-discovered in this format, it was the greatest common denominator
-for compatibility in the test network, and in conjunction with the
-shadowed features provided by the example configuration, should
-provide reasonable protection against cracking attempts in a typical
-LAN scenario, provided all machines are secured from root compromises
-and physical network access is restricted.  Further sniffing
-protection can be provided through the use of IPSec to protect RPC
-traffic.
+Due to lack of common portable perl hashing modules and in order
+to maximize cross platform compatibility, this module uses md5
+password hashes on Linux and Solaris by default. Although collisions
+have been discovered in this format, it was the greatest common
+denominator for compatibility in the test network, and in conjunction
+with the shadowed features provided by the example configuration,
+should provide reasonable protection against cracking attempts in
+a typical LAN scenario, provided all machines are secured from root
+compromises and physical network access is restricted.  Further
+sniffing protection can be provided through the use of IPSec to
+protect RPC traffic.
 
 Dumped BSD-style passwords will use the EKsblowfish format. Provisions
 exist for managing other formats in the code, though this would
@@ -128,15 +127,15 @@ without the 'local account only' section.
 
 /etc/nsswitch.conf should contain::
 
-passwd:     compat
-shadow:     compat
-group:      files nis
-netgroup:   files nis
-aliases:    files nis
+  passwd:     compat
+  shadow:     compat
+  group:      files nis
+  netgroup:   files nis
+  aliases:    files nis
 
-/etc/passwd & /etc/shadow::
+/etc/passwd & /etc/shadow:
 
-passwd should get all data (for e.g. uid lookups):
+passwd should get all data (for e.g. uid lookups)::
 
   # tail -n 1 /etc/passwd
   +
@@ -149,15 +148,15 @@ Reference shadow fields are::
 
 Where:
 
-   - name: accountname
-   - pass: enc pass
-   - lastchange: last change date (unixepoch days)
-   - minage: minimum days before next change (empty/0 -> none)
-   - maxage: maximum days before next change (empty/0 -> disabled)
-   - warning: warning days before expiry (0 -> nowarn)
-   - inactivity: days valid expiry where login/forced chg allowed (0->none)
-   - expiration date: days valid expiry where login/forced chg allowed (0->none)
-   - reserved: unused
+  - name: accountname
+  - pass: enc pass
+  - lastchange: last change date (unixepoch days)
+  - minage: minimum days before next change (empty/0 -> none)
+  - maxage: maximum days before next change (empty/0 -> disabled)
+  - warning: warning days before expiry (0 -> nowarn)
+  - inactivity: days valid expiry where login/forced chg allowed (0->none)
+  - expiration date: days valid expiry where login/forced chg allowed (0->none)
+  - reserved: unused
 
 note: maxage disabled disables warning/inactivity/expiration functionality.
 
@@ -197,7 +196,7 @@ hashes are loaded generically via the 'loadgetent' command and
 will work without having taken this step.
 
 .. [#] At the time of writing (rhel7 currency), this behavior is defined
-in the function copy_spwd_changes() of glibc 2.17's compat-spwd.c.
+       in the function copy_spwd_changes() of glibc 2.17's compat-spwd.c.
 
 OpenBSD
 ~~~~~~~
