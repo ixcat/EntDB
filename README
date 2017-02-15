@@ -12,6 +12,6 @@ module installation is as follows:
   make
   make install
 
-documentation concerning system integration into to the NIS network
-and other related details is in doc/entdb.txt
+See doc/entdb.txt for actual usage documentation and details concerning 
+setup and integration of an entdb managed NIS network.
 
